@@ -1,123 +1,88 @@
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.HierarchyEvent;
 import java.util.function.Consumer;
 
 public class StartScreen extends JPanel {
 
-    // Controls
-    private final JSpinner livesSpinner;
-    private final JComboBox<String> difficultyCombo;
-    private final JCheckBox autoRestartCheck;
-    private final JTextField customWordField;
-    private final JButton startButton;
-    private final JButton quitButton;
+    // Diese Felder müssen exakt den Komponenten-Namen in deiner .form entsprechen!
+    private JPanel panel1;
+    private JSpinner livesSpinner;
+    private JComboBox<String> difficultyCombo;
+    private JCheckBox autoRestartCheck;
+    private JTextField customWordField;
+    private JButton startButton;
+    private JButton quitButton;
 
-    // Settings-Container
+    // ---- Settings-Container ----
     public static class Settings {
         public final int lives;
-        public final String difficulty;     // "Leicht", "Mittel", "Schwer"
+        public final String difficulty;
         public final boolean autoRestart;
-        public final String customWord;     // optional, "" wenn leer
+        public final String customWord;
 
         public Settings(int lives, String difficulty, boolean autoRestart, String customWord) {
             this.lives = Math.max(1, lives);
-            this.difficulty = difficulty;
+            this.difficulty = (difficulty == null) ? "Mittel" : difficulty;
             this.autoRestart = autoRestart;
-            this.customWord = customWord == null ? "" : customWord.trim().toUpperCase();
+            this.customWord = (customWord == null) ? "" : customWord.trim().toUpperCase();
         }
     }
 
-    /**
-     * @param onStart wird mit den gewählten Einstellungen aufgerufen
-     * @param onQuit  wird aufgerufen, wenn Quit gedrückt wird
-     */
+    // ---- Konstruktor (Callbacks für Start und Quit) ----
     public StartScreen(Consumer<Settings> onStart, Runnable onQuit) {
-        setLayout(new GridBagLayout());
-        setBackground(Color.WHITE);
+        // IntelliJ füllt panel1 und alle Felder automatisch aus der .form
+        setLayout(new BorderLayout());
+        add(panel1, BorderLayout.CENTER);
 
-        GridBagConstraints c = new GridBagConstraints();
-        c.insets = new Insets(10, 12, 10, 12);
-        c.anchor = GridBagConstraints.WEST;
-        c.gridx = 0; c.gridy = 0; c.gridwidth = 2;
+        // --- ComboBox initialisieren ---
+        if (difficultyCombo != null) {
+            DefaultComboBoxModel<String> model = new DefaultComboBoxModel<>();
+            model.addElement("Leicht");
+            model.addElement("Mittel");
+            model.addElement("Schwer");
+            difficultyCombo.setModel(model);
+            difficultyCombo.setSelectedItem("Mittel");
+        }
 
-        // Titel
-        JLabel title = new JLabel("Hangman – Start");
-        title.setFont(title.getFont().deriveFont(Font.BOLD, 24f));
-        add(title, c);
+        // --- Spinner Standardwert ---
+        if (livesSpinner != null) {
+            SpinnerNumberModel spinnerModel = new SpinnerNumberModel(8, 1, 12, 1);
+            livesSpinner.setModel(spinnerModel);
+        }
 
-        // Leben / Fehler
-        c.gridy++;
-        c.gridwidth = 1;
-        add(new JLabel("Max. Fehler (Leben):"), c);
+        // Aktionen verdrahten
+        if (startButton != null) {
+            startButton.addActionListener(e -> {
+                Settings s = collectSettings();
+                if (onStart != null) onStart.accept(s);
+            });
+        }
 
-        livesSpinner = new JSpinner(new SpinnerNumberModel(8, 1, 12, 1));
-        c.gridx = 1;
-        add(livesSpinner, c);
+        if (quitButton != null) {
+            quitButton.addActionListener(e -> {
+                if (onQuit != null) onQuit.run();
+                Window w = SwingUtilities.getWindowAncestor(StartScreen.this);
+                if (w != null) w.dispose();
+            });
+        }
 
-        // Schwierigkeit (optional)
-        c.gridx = 0; c.gridy++;
-        add(new JLabel("Schwierigkeit:"), c);
-        difficultyCombo = new JComboBox<>(new String[]{"Leicht", "Mittel", "Schwer"});
-        difficultyCombo.setSelectedIndex(1);
-        c.gridx = 1;
-        add(difficultyCombo, c);
-
-        // Auto-Restart (optional)
-        c.gridx = 0; c.gridy++;
-        autoRestartCheck = new JCheckBox("Nach Sieg/Niederlage automatisch neu starten");
-        autoRestartCheck.setBackground(Color.WHITE);
-        c.gridwidth = 2;
-        add(autoRestartCheck, c);
-
-        // Eigenes Wort (optional)
-        c.gridy++;
-        c.gridwidth = 1;
-        add(new JLabel("Eigenes Wort (optional):"), c);
-        customWordField = new JTextField(16);
-        c.gridx = 1;
-        add(customWordField, c);
-
-        // Buttons unten
-        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        buttons.setOpaque(false);
-        startButton = new JButton("Spiel starten");
-        quitButton = new JButton("Quit");
-        buttons.add(quitButton);
-        buttons.add(startButton);
-
-        c.gridx = 0; c.gridy++;
-        c.gridwidth = 2;
-        c.anchor = GridBagConstraints.EAST;
-        add(buttons, c);
-
-        // Actions
-        startButton.addActionListener(e -> {
-            Settings s = collectSettings();
-            onStart.accept(s);
+        // Default-Button (ENTER = Start) erst setzen, wenn Fenster sichtbar ist
+        addHierarchyListener(e -> {
+            if ((e.getChangeFlags() & HierarchyEvent.DISPLAYABILITY_CHANGED) != 0 && isDisplayable()) {
+                JRootPane root = SwingUtilities.getRootPane(StartScreen.this);
+                if (root != null && startButton != null)
+                    root.setDefaultButton(startButton);
+            }
         });
-
-        quitButton.addActionListener(e -> {
-            if (onQuit != null) onQuit.run();
-            // Fallback: aktuelles Fenster schließen
-            Window w = SwingUtilities.getWindowAncestor(StartScreen.this);
-            if (w != null) w.dispose();
-        });
-
-        // Enter auf Start
-        SwingUtilities.getRootPane(this).setDefaultButton(startButton);
     }
 
+    // ---- Daten aus Formular lesen ----
     private Settings collectSettings() {
-        int lives = (Integer) livesSpinner.getValue();
-        String diff = (String) difficultyCombo.getSelectedItem();
-        boolean auto = autoRestartCheck.isSelected();
-        String custom = customWordField.getText();
+        int lives = (livesSpinner != null) ? (Integer) livesSpinner.getValue() : 8;
+        String diff = (difficultyCombo != null) ? (String) difficultyCombo.getSelectedItem() : "Mittel";
+        boolean auto = (autoRestartCheck != null) && autoRestartCheck.isSelected();
+        String custom = (customWordField != null) ? customWordField.getText() : "";
         return new Settings(lives, diff, auto, custom);
     }
-
-    // Optional: öffentliche Setter, falls du per Code Defaults ändern willst
-    public void setLives(int lives) { livesSpinner.setValue(Math.max(1, lives)); }
-    public void setDifficulty(String difficulty) { difficultyCombo.setSelectedItem(difficulty); }
-    public void setAutoRestart(boolean v) { autoRestartCheck.setSelected(v); }
-    public void setCustomWord(String w) { customWordField.setText(w); }
 }
