@@ -5,84 +5,105 @@ import java.util.function.Consumer;
 
 public class StartScreen extends JPanel {
 
-    // Diese Felder müssen exakt den Komponenten-Namen in deiner .form entsprechen!
     private JPanel panel1;
     private JSpinner livesSpinner;
     private JComboBox<String> difficultyCombo;
     private JCheckBox autoRestartCheck;
-    private JTextField customWordField;
     private JButton startButton;
     private JButton quitButton;
 
-    // ---- Settings-Container ----
+    // Container für Einstellungen
     public static class Settings {
         public final int lives;
         public final String difficulty;
         public final boolean autoRestart;
-        public final String customWord;
 
-        public Settings(int lives, String difficulty, boolean autoRestart, String customWord) {
+        public Settings(int lives, String difficulty, boolean autoRestart) {
             this.lives = Math.max(1, lives);
             this.difficulty = (difficulty == null) ? "Mittel" : difficulty;
             this.autoRestart = autoRestart;
-            this.customWord = (customWord == null) ? "" : customWord.trim().toUpperCase();
         }
     }
 
-    // ---- Konstruktor (Callbacks für Start und Quit) ----
     public StartScreen(Consumer<Settings> onStart, Runnable onQuit) {
-        // IntelliJ füllt panel1 und alle Felder automatisch aus der .form
+
         setLayout(new BorderLayout());
         add(panel1, BorderLayout.CENTER);
 
-        // --- ComboBox initialisieren ---
+        // ---------- DESIGN (hell, modern) ----------
+        Color background = new Color(245, 247, 255);     // Hell-blau/weiß
+        Color accent = new Color(45, 120, 255);          // Blau für Buttons
+        Color hover = new Color(30, 90, 210);            // Button hover
+
+        setBackground(background);
+        panel1.setBackground(background);
+
+        Font font = new Font("Segoe UI", Font.PLAIN, 16);
+
+        for (Component c : panel1.getComponents()) {
+            c.setFont(font);
+            c.setForeground(Color.DARK_GRAY);
+            if (c instanceof JPanel) c.setBackground(background);
+        }
+
+        // ---------- ComboBox (Schwierigkeit) ----------
         if (difficultyCombo != null) {
-            DefaultComboBoxModel<String> model = new DefaultComboBoxModel<>();
-            model.addElement("Leicht");
-            model.addElement("Mittel");
-            model.addElement("Schwer");
-            difficultyCombo.setModel(model);
+            difficultyCombo.setModel(
+                    new DefaultComboBoxModel<>(new String[] {"Leicht", "Mittel", "Schwer"})
+            );
             difficultyCombo.setSelectedItem("Mittel");
+            difficultyCombo.setBackground(Color.WHITE);
+            difficultyCombo.setForeground(Color.BLACK);
         }
 
-        // --- Spinner Standardwert ---
+        // ---------- Spinner (Leben) ----------
         if (livesSpinner != null) {
-            SpinnerNumberModel spinnerModel = new SpinnerNumberModel(8, 1, 12, 1);
-            livesSpinner.setModel(spinnerModel);
+            livesSpinner.setModel(new SpinnerNumberModel(8, 1, 12, 1));
+            JComponent editor = livesSpinner.getEditor();
+            editor.setBackground(Color.WHITE);
+            editor.setForeground(Color.BLACK);
         }
 
-        // Aktionen verdrahten
-        if (startButton != null) {
-            startButton.addActionListener(e -> {
-                Settings s = collectSettings();
-                if (onStart != null) onStart.accept(s);
-            });
-        }
+        // ---------- Buttons ----------
+        styleButton(startButton, accent, hover);
+        styleButton(quitButton, new Color(210, 70, 70), new Color(160, 40, 40));
 
-        if (quitButton != null) {
-            quitButton.addActionListener(e -> {
-                if (onQuit != null) onQuit.run();
-                Window w = SwingUtilities.getWindowAncestor(StartScreen.this);
-                if (w != null) w.dispose();
-            });
-        }
+        // ---------- Events ----------
+        startButton.addActionListener(e -> {
+            Settings s = collectSettings();
+            if (onStart != null) onStart.accept(s);
+        });
 
-        // Default-Button (ENTER = Start) erst setzen, wenn Fenster sichtbar ist
+        quitButton.addActionListener(e -> {
+            if (onQuit != null) onQuit.run();
+            Window w = SwingUtilities.getWindowAncestor(StartScreen.this);
+            if (w != null) w.dispose();
+        });
+
+        // ENTER als Default-Button
         addHierarchyListener(e -> {
             if ((e.getChangeFlags() & HierarchyEvent.DISPLAYABILITY_CHANGED) != 0 && isDisplayable()) {
-                JRootPane root = SwingUtilities.getRootPane(StartScreen.this);
-                if (root != null && startButton != null)
-                    root.setDefaultButton(startButton);
+                SwingUtilities.getRootPane(StartScreen.this).setDefaultButton(startButton);
             }
         });
     }
 
-    // ---- Daten aus Formular lesen ----
+    private void styleButton(JButton button, Color base, Color hover) {
+        button.setFocusPainted(false);
+        button.setBackground(base);
+        button.setForeground(Color.WHITE);
+        button.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) { button.setBackground(hover); }
+            public void mouseExited(java.awt.event.MouseEvent evt) { button.setBackground(base); }
+        });
+    }
+
     private Settings collectSettings() {
         int lives = (livesSpinner != null) ? (Integer) livesSpinner.getValue() : 8;
         String diff = (difficultyCombo != null) ? (String) difficultyCombo.getSelectedItem() : "Mittel";
         boolean auto = (autoRestartCheck != null) && autoRestartCheck.isSelected();
-        String custom = (customWordField != null) ? customWordField.getText() : "";
-        return new Settings(lives, diff, auto, custom);
+        return new Settings(lives, diff, auto);
     }
 }
